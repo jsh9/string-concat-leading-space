@@ -1,0 +1,90 @@
+---
+exclude: ^tests/test_data/
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: requirements-txt-fixer
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: check-toml
+      - id: check-yaml
+      - id: name-tests-test
+        args: [--pytest-test-first]
+        exclude: ^tests/helpers\.py$
+      - id: check-merge-conflict
+  - repo: https://github.com/jsh9/muff-pre-commit
+    rev: 0.15.20
+    hooks:
+      - id: muff-format
+        args: [--config, muff.toml]
+  - repo: https://github.com/jsh9/blank-line-after-blocks
+    rev: 0.1.4
+    hooks:
+      - id: blank-line-after-blocks
+  - repo: https://github.com/jsh9/format-docstring
+    rev: 0.4.1
+    hooks:
+      - id: format-docstring
+        name: Format docstrings in .py files
+        args: [--line-length=79]
+  - repo: https://github.com/lyz-code/yamlfix
+    rev: 1.19.1
+    hooks:
+      - id: yamlfix
+  - repo: https://github.com/pappasam/toml-sort
+    rev: v0.24.4
+    hooks:
+      - id: toml-sort-fix
+        args:
+          - --in-place
+          - --sort-table-keys
+          - --sort-inline-tables
+          - --sort-first=name,version,dependencies,requires-python,authors,maintainers
+          - --trailing-comma-inline-array
+          - --sort-inline-arrays
+  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: v2.16.0
+    hooks:
+      - id: pretty-format-ini
+        args: [--autofix]
+  - repo: https://github.com/hukkin/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        args: [--wrap=79, --number]
+        additional_dependencies: [mdformat-gfm]
+  - repo: https://github.com/jsh9/markdown-toc-creator
+    rev: 0.1.3
+    hooks:
+      - id: markdown-toc-creator
+        exclude: ^AGENTS\.md$|^CHANGELOG\.md$
+  - repo: https://github.com/jsh9/markdown-heading-numbering
+    rev: 0.1.1
+    hooks:
+      - id: markdown-heading-numbering
+        exclude: ^CHANGELOG\.md$
+  - repo: https://github.com/jsh9/pre-commit-tox-version-sync
+    rev: 0.1.1
+    hooks:
+      - id: sync-precommit-tox-versions
+        args:
+          - --pre-commit-repo
+          - https://github.com/jsh9/muff-pre-commit
+          - --tox-env
+          - muff-lint
+          - --tox-env
+          - muff-format
+          - --tox-dep
+          - muff
+  - repo: local
+    hooks:
+      - id: string-concat-leading-space
+        name: Run on self (move trailing spaces of concatenated strings)
+        entry: python
+        args: [-m, string_concat_leading_space.main]
+        language: python
+        types: [python]
+        additional_dependencies: [click>=8.0]

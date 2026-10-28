@@ -1,0 +1,8 @@
+---
+- id: string-concat-leading-space
+  name: Move spaces to the start of concatenated string pieces
+  description: In implicitly concatenated strings that span lines, move the trailing
+    spaces of each piece to the start of the next piece.
+  entry: string-concat-leading-space
+  language: python
+  types: [python]
