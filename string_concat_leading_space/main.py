@@ -74,10 +74,11 @@ def fixFile(filename: str, *, lineLength: int = 79) -> int:
     except OSError as exc:
         _report(f'{filename}: error: cannot read the file: {exc}')
         return 1
-    except (SyntaxError, ValueError):
+    except (SyntaxError, ValueError, RecursionError):
         # Such as invalid bytes, an invalid encoding declaration, null bytes,
-        # or invalid syntax. Depending on the Python version, the same
-        # problem can come from detect_encoding(), decoding, or parsing.
+        # invalid syntax, or too deep nesting. Depending on the Python
+        # version, the same problem can come from detect_encoding(),
+        # decoding, or parsing.
         _report(f'{filename}: cannot parse, skipped')
         return 0
 
@@ -92,15 +93,27 @@ def fixFile(filename: str, *, lineLength: int = 79) -> int:
 
     status = 0
     if result.source != source:
-        if not _hasSameAst(tree, result.source):
+        try:
+            hasSameAst = _hasSameAst(tree, result.source)
+        except RecursionError:
+            # ast.dump() is recursive and fails on very deep nesting
+            _report(f'{filename}: too deeply nested to compare ASTs, skipped')
+            return 0
+
+        if not hasSameAst:
             _report(
                 f'{filename}: error: the rewrite would change the AST;'
                 ' file left unchanged'
             )
             return 1
 
+        try:
+            path.write_text(result.source, encoding=encoding, newline='')
+        except OSError as exc:
+            _report(f'{filename}: error: cannot write the file: {exc}')
+            return 1
+
         _report(f'Rewriting {filename}')
-        path.write_text(result.source, encoding=encoding, newline='')
         status = 1
 
     for pair in result.skippedPairs:
@@ -128,7 +141,34 @@ def _hasSameAst(tree: ast.Module, newSource: str) -> bool:
     except (SyntaxError, ValueError):
         return False
 
-    return ast.dump(newTree) == ast.dump(tree)
+    return _dumpAst(newTree) == _dumpAst(tree)
+
+
+def _dumpAst(tree: ast.AST) -> str:
+    """
+    Dump an AST for comparison, ignoring ``Constant.kind``.
+
+    ``kind`` is ``'u'`` for a literal with the ``u`` prefix, which has no
+    effect at runtime. When Python 3.12+ merges the pieces of an f-string
+    concatenation, the merged constant takes ``kind`` from its first piece of
+    literal text. So moving the spaces out of ``f'{x} '`` into ``u'b'`` changes
+    ``kind`` but not the value.
+
+    Parameters
+    ----------
+    tree : ast.AST
+        The AST to dump. Its ``Constant`` nodes are changed in place.
+
+    Returns
+    -------
+    str
+        The dump of the AST.
+    """
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant):
+            node.kind = None
+
+    return ast.dump(tree)
 
 
 def _report(message: str) -> None:

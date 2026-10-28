@@ -41,6 +41,11 @@ it to get oriented before making changes.
 - `_getPieceText()` checks each piece's text against its tokens and raises
   `TokenPositionError` on a mismatch, because the AST comparison would not
   catch spaces moved inside comments.
+- The AST comparison (`_dumpAst()` in `main.py`, `dumpAst()` in
+  `tests/helpers.py`) ignores `Constant.kind`. On Python 3.12+, an f-string
+  concatenation takes `kind='u'` from its first piece of literal text, so
+  moving the spaces out of `f'{x} '` into `u'b'` changes `kind` but not the
+  value.
 - `_selectMoves()` checks the line length from the last pair backwards: a line
   can gain spaces at its first piece and lose spaces at its last piece, and the
   loss depends on the next pair. Only lines that go from within the limit to

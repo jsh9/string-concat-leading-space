@@ -904,6 +904,61 @@ def testHandlesEveryPrefixAndQuote(prefix: str, quote: str) -> None:
     checkFix(before, after)
 
 
+@pytest.mark.parametrize('prefix', ['', 'r', 'u', 'U', 'f', 'rf', 'F', 'Rf'])
+@pytest.mark.parametrize(
+    'nextPrefix',
+    ['', 'r', 'u', 'U', 'f', 'rf', 'F', 'Rf'],
+)
+def testHandlesMixedPrefixes(prefix: str, nextPrefix: str) -> None:
+    # In f-strings, {x} is a replacement field; elsewhere, it is plain text
+    before = f"x = (\n    {prefix}'{{x}} '\n    {nextPrefix}'{{x}}'\n)\n"
+    after = f"x = (\n    {prefix}'{{x}}'\n    {nextPrefix}' {{x}}'\n)\n"
+    checkFix(before, after)
+
+
+@pytest.mark.parametrize(
+    'source',
+    [
+        pytest.param('', id='empty'),
+        pytest.param('\n', id='newline-only'),
+        pytest.param('# only a comment', id='comment-only'),
+        pytest.param("x = 'no pair '", id='single-piece'),
+    ],
+)
+def testLeavesSourcesWithoutPairsUnchanged(source: str) -> None:
+    result = checkFix(source, source)
+    assert result.fixedPairs == 0
+
+
+@pytest.mark.parametrize(
+    ('before', 'after'),
+    [
+        pytest.param(
+            "x = (\n    'form feed line '\n\f\n    'between'\n)\n",
+            "x = (\n    'form feed line'\n\f\n    ' between'\n)\n",
+            id='form-feed-line-between-pieces',
+        ),
+        pytest.param(
+            "x = (\n    'form feed '\n\f    'indentation'\n)\n",
+            "x = (\n    'form feed'\n\f    ' indentation'\n)\n",
+            id='form-feed-in-indentation',
+        ),
+        pytest.param(
+            "x = (\n\t'tab '\n\t'indentation'\n)\n",
+            "x = (\n\t'tab'\n\t' indentation'\n)\n",
+            id='tab-indentation',
+        ),
+        pytest.param(
+            "x = (\n    '😀 '  # 😀\n    f'{x}😀 '\n    '😀'\n)\n",
+            "x = (\n    '😀'  # 😀\n    f' {x}😀'\n    ' 😀'\n)\n",
+            id='astral-characters',
+        ),
+    ],
+)
+def testHandlesUnusualCharactersAroundPieces(before: str, after: str) -> None:
+    checkFix(before, after)
+
+
 @pytest.mark.parametrize(
     ('before', 'after'),
     [
@@ -1032,21 +1087,74 @@ def testOffsetsFollowTokenizeLineSplitting(char: str, place: str) -> None:
     checkFix(before, after)
 
 
+@pytest.mark.parametrize(
+    ('before', 'after'),
+    [
+        pytest.param(
+            """
+            x = (
+                'plain one '
+                'two'
+            )
+            """,
+            """
+            x = (
+                'plain one'
+                ' two'
+            )
+            """,
+            id='basic',
+        ),
+        pytest.param(
+            r"""
+            x = (
+                'a piece that \
+            spans lines '
+                'next'
+            )
+            """,
+            r"""
+            x = (
+                'a piece that \
+            spans lines'
+                ' next'
+            )
+            """,
+            id='piece-spanning-lines',
+        ),
+        pytest.param(
+            """
+            x = (
+                f'{
+                    y
+                } '
+                'next'
+            )
+            """,
+            """
+            x = (
+                f'{
+                    y
+                }'
+                ' next'
+            )
+            """,
+            id='replacement-field-spanning-lines',
+            marks=requiresPy312,
+        ),
+        pytest.param(
+            "x = ('no trailing '\n     'newline')",
+            "x = ('no trailing'\n     ' newline')",
+            id='no-trailing-newline',
+        ),
+    ],
+)
 @pytest.mark.parametrize('newline', ['\n', '\r\n', '\r'])
-def testPreservesLineEndings(newline: str) -> None:
-    before = code("""
-        x = (
-            'plain one '
-            'two'
-        )
-        """).replace('\n', newline)
-    after = code("""
-        x = (
-            'plain one'
-            ' two'
-        )
-        """).replace('\n', newline)
-    checkFix(before, after)
+def testPreservesLineEndings(before: str, after: str, newline: str) -> None:
+    checkFix(
+        code(before).replace('\n', newline),
+        code(after).replace('\n', newline),
+    )
 
 
 def testPreservesMixedLineEndings() -> None:

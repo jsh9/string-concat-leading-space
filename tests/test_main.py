@@ -4,7 +4,7 @@ import importlib.metadata
 import tokenize
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import pytest
 from click.testing import CliRunner, Result
@@ -69,6 +69,10 @@ def testSampleFile(tmp_path: Path) -> None:
         pytest.param([UNPARSEABLE], 0, [], id='unparseable'),
         pytest.param([UNPARSEABLE, NEEDS_FIX], 1, [1], id='unparseable-fix'),
         pytest.param([TOO_LONG], 0, [], id='only-skipped-pairs'),
+        pytest.param([''], 0, [], id='empty-file'),
+        pytest.param(
+            [NEEDS_FIX.removesuffix('\n')], 1, [0], id='no-trailing-newline'
+        ),
     ],
 )
 def testExitCodes(
@@ -307,3 +311,84 @@ def testVersionOption() -> None:
     assert result.exit_code == 0
     version = importlib.metadata.version('string-concat-leading-space')
     assert result.output.endswith(f'version {version}\n')
+
+
+@pytest.mark.parametrize(
+    ('before', 'after'),
+    [
+        pytest.param(
+            "v = 1\nx = (\n    f'{v} '\n    u'b'\n)\n",
+            "v = 1\nx = (\n    f'{v}'\n    u' b'\n)\n",
+            id='f-string-then-u-string',
+        ),
+        pytest.param(
+            "v = 1\nx = (\n    u'a '\n    f'{v} '\n    U'c'\n)\n",
+            "v = 1\nx = (\n    u'a'\n    f' {v}'\n    U' c'\n)\n",
+            id='u-string-f-string-u-string',
+        ),
+    ],
+)
+def testIgnoresUnicodePrefixWhenComparingAsts(
+        tmp_path: Path,
+        before: str,
+        after: str,
+) -> None:
+    # On Python 3.12+, Constant.kind ('u') moves to another piece here
+    path = writeFile(tmp_path / 'file.py', before)
+
+    result = runCli(path)
+
+    assert result.exit_code == 1
+    assert result.output == f'Rewriting {path}\n'
+    assert Path(path).read_text(encoding='utf-8') == after
+
+
+def testReportsWriteErrors(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failingWriteText(*_args: object, **_kwargs: object) -> NoReturn:
+        raise PermissionError('read-only file')
+
+    path = writeFile(tmp_path / 'file.py', NEEDS_FIX)
+    monkeypatch.setattr(Path, 'write_text', failingWriteText)
+
+    result = runCli(path)
+
+    assert result.exit_code == 1
+    assert result.output == (
+        f'{path}: error: cannot write the file: read-only file\n'
+    )
+    assert Path(path).read_text(encoding='utf-8') == NEEDS_FIX
+
+
+def testSkipsFilesTooDeeplyNestedToCompare(tmp_path: Path) -> None:
+    # ast.parse() handles this, but the recursive ast.dump() does not
+    content = NEEDS_FIX + 'y = ' + ' + '.join(['1'] * 1500) + '\n'
+    path = writeFile(tmp_path / 'file.py', content)
+
+    result = runCli(path)
+
+    assert result.exit_code == 0
+    assert result.output == (
+        f'{path}: too deeply nested to compare ASTs, skipped\n'
+    )
+    assert Path(path).read_text(encoding='utf-8') == content
+
+
+def testSkipsFilesTooDeeplyNestedToParse(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Such as a 100,000-term expression on Python 3.14
+    def recursingParse(*_args: object, **_kwargs: object) -> NoReturn:
+        raise RecursionError('maximum recursion depth exceeded')
+
+    monkeypatch.setattr(mainModule, '_parse', recursingParse)
+    path = writeFile(tmp_path / 'file.py', NEEDS_FIX)
+
+    result = runCli(path)
+
+    assert result.exit_code == 0
+    assert result.output == f'{path}: cannot parse, skipped\n'
+    assert Path(path).read_text(encoding='utf-8') == NEEDS_FIX

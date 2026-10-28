@@ -109,9 +109,10 @@ The tool takes file names, rewrites the files in place, and prints
 | `1`       | At least one file was changed, or an error happened     |
 | `2`       | Invalid command-line options, such as `--line-length=0` |
 
-Errors are files that cannot be read, and files whose AST would change (which
-would be a bug in this tool). Files that cannot be decoded or parsed are
-skipped with a message; they are not errors.
+Errors are files that cannot be read or written, and files whose AST would
+change (which would be a bug in this tool). Files that cannot be decoded or
+parsed, or that are nested too deeply to compare their ASTs, are skipped with a
+message; they are not errors.
 
 ## 4. Options
 
@@ -149,4 +150,6 @@ Lines that are already longer than `--line-length` are not checked.
 
 **Files that cannot be parsed are skipped.** The hook parses files with the
 Python version that runs it, so it skips, for example, files that use t-strings
-when it runs on Python 3.13 or earlier.
+when it runs on Python 3.13 or earlier. Files with expressions nested more than
+about 1,000 levels deep are skipped too, because the AST comparison cannot
+handle them.
