@@ -1,0 +1,51 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools-scm[toml]>=6.2", "setuptools>=77"]
+
+[project]
+name = "string-concat-leading-space"
+version = "0.1.0"
+dependencies = [
+  "click>=8.0",
+]
+requires-python = ">=3.10"
+authors = [{name = "jsh9", email = "25124332+jsh9@users.noreply.github.com"}]
+maintainers = [
+  {name = "jsh9", email = "25124332+jsh9@users.noreply.github.com"},
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Software Development :: Quality Assurance",
+]
+description = "A Python formatter to move trailing spaces of implicitly concatenated strings to the start of the next piece"
+keywords = ["code-style", "formatter", "pre-commit", "python", "string"]
+license = "MIT"
+license-files = ["LICENSE"]
+readme = "README.md"
+
+[project.scripts]
+string-concat-leading-space = "string_concat_leading_space.main:main"
+
+[project.urls]
+Changelog = "https://github.com/jsh9/string-concat-leading-space/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/jsh9/string-concat-leading-space"
+Issues = "https://github.com/jsh9/string-concat-leading-space/issues"
+Repository = "https://github.com/jsh9/string-concat-leading-space.git"
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+exclude = ["testing*", "tests*"]
